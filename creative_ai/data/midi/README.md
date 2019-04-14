@@ -8,7 +8,7 @@ The `mid2asc.c` file in this folder can convert midi files into ascii text. (Cre
 
 Compile the file in Visual Studio or Xcode. Although it is C code, not C++, you should be able to compile it just like the other C++ code you've compiled in this course. You should put the executable into this folder.
 
-When you've successfully compiled it, you can convert one file by stepping into the directory where the `mid2asci` executable lives and with a terminal command as such:
+When you've successfully compiled it, you can convert one file by stepping into the directory where the `mid2asc` executable lives and with a terminal command as such:
 
 `./mid2asc midifile > textfile`
 
