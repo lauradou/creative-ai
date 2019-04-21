@@ -1,21 +1,30 @@
 #!/usr/bin/env python
 import sys
 sys.dont_write_bytecode = True # Suppress .pyc files
-
+import matplotlib.pyplot as plot
+from scipy.io import wavfile
 import random
 
-import pysynth
+import pysynth_e as pse
+import pysynth_d as psd
+from mixfiles import mix_files
 from creative_ai.utils.menu import Menu
 from creative_ai.data.dataLoader import *
 from creative_ai.models.musicInfo import *
 from creative_ai.models.languageModel import LanguageModel
 
 # FIXME Add your team name
-TEAM = 'YOUR NAME HERE'
+TEAM = 'HISSMTD'
 LYRICSDIRS = ['the_beatles']
 TESTLYRICSDIRS = ['the_beatles_test']
-MUSICDIRS = ['gamecube']
+MUSICDIRS = ['n64']
 WAVDIR = 'wav/'
+
+
+scale = [ [ 'c4', 'c5', 'c6', 'd4', 'd5', 'd6', 'e4', 'e5', 'e6', 'f4', 'f5', 'f6', 'g4', 'g5', 'g6' ],
+        [ 'd4', 'd5', 'd6', 'e4', 'e5', 'e6', 'f#4', 'f#5', 'f#6', 'g4', 'g5', 'g6', 'a4', 'a5', 'a6' ],
+        [ 'g4', 'g5', 'g6', 'a4', 'a5', 'a6', 'b4', 'b5', 'b6', 'c4', 'c5', 'c6', 'd4', 'd5', 'd6' ],
+        [ 'a4', 'a5', 'a6', 'b4', 'b5', 'a6', 'c#4', 'c#5', 'c#6', 'd4', 'd5', 'd6', 'e4', 'e5', 'e6' ] ]
 
 def output_models(val, output_fn = None):
     """
@@ -51,7 +60,7 @@ def printSongLyrics(verseOne, verseTwo, chorus):
     Requires: verseOne, verseTwo, and chorus are lists of lists of strings
     Modifies: nothing
     Effects:  prints the song.
-    
+
     This function is done for you.
     """
     verses = [verseOne, chorus, verseTwo, chorus]
@@ -72,7 +81,7 @@ def trainLyricModels(lyricDirs, test=False):
               them using the text loaded from the data loader. The list
               should be in tri-, then bi-, then unigramModel order.
               Returns the list of trained models.
-              
+
     This function is done for you.
     """
     model = LanguageModel()
@@ -92,7 +101,7 @@ def trainMusicModels(musicDirs):
               and takes a music directory name instead of an artist name.
               Returns a list of trained models in order of tri-, then bi-, then
               unigramModel objects.
-              
+
     This function is done for you.
     """
     model = LanguageModel()
@@ -121,14 +130,13 @@ def runLyricsGenerator(models):
 
     printSongLyrics(verseOne, verseTwo, chorus)
 
-def runMusicGenerator(models, songName):
+def runMusicGenerator(models, songName, instrument):
     """
     Requires: models is a list of trained models
     Modifies: nothing
     Effects:  uses models to generate a song and write it to the file
               named songName.wav
     """
-
     verseOne = []
     verseTwo = []
     chorus = []
@@ -144,8 +152,30 @@ def runMusicGenerator(models, songName):
     song.extend(chorus)
     song.extend(verseOne)
     song.extend(chorus)
+    for i in range(len(song)):
+        if not isinstance(song[i], tuple):
+            save = song[i]
+            song[i] = (save, 2 ** (random.randint(1, 4)))
+    print(song)
+    if instrument == 'e':
+        pse.make_wav(song, fn=songName)
+    if instrument == 'd':
+        psd.make_wav(song, fn=songName)
 
-    pysynth.make_wav(song, fn=songName)
+def generateSpectrogram(songName):
+    
+    samplingFrequency, signalData = wavfile.read(WAVDIR + songName + '.wav')
+    
+    plot.subplot(211)
+    plot.title('Spectrogram of ' + songName + '.wav')
+    plot.plot(signalData)
+    plot.xlabel('Sample')
+    plot.ylabel('Amplitude')
+    plot.subplot(212)
+    plot.specgram(signalData,Fs=samplingFrequency)
+    plot.xlabel('Time')
+    plot.ylabel('Frequency')
+    plot.show()
 
 ###############################################################################
 # Begin Core >> FOR CORE IMPLEMENTION, DO NOT EDIT OUTSIDE OF THIS SECTION <<
@@ -153,7 +183,7 @@ def runMusicGenerator(models, songName):
 
 def generateTokenSentence(model, desiredLength):
     """
-    Requires: model is a single trained languageModel object.
+    Requires: model is a single, trained languageModel object.
               desiredLength is the desired length of the sentence.
     Modifies: nothing
     Effects:  returns a list of strings where each string is a word in the
@@ -163,8 +193,15 @@ def generateTokenSentence(model, desiredLength):
               For more details about generating a sentence using the
               NGramModels, see the spec.
     """
-    pass
-
+    lyrics = ['^::^', '^:::^']
+    nextWord = ''
+    filterScale = scale[random.randint(0,len(scale) - 1)]
+    while sentenceTooLong(desiredLength, len(lyrics)) == False and nextWord != "$:::$":
+        nextWord = model.getNextToken(lyrics, filterScale)
+        if nextWord != "^::^" and nextWord != "^:::^" and nextWord != "$:::$":
+            lyrics.append(nextWord)
+    
+    return lyrics[2:]
 ###############################################################################
 # End Core
 ###############################################################################
@@ -174,10 +211,10 @@ def generateTokenSentence(model, desiredLength):
 ###############################################################################
 
 PROMPT = [
-    'Generate song lyrics by The Beatles',
-    'Generate a song using data from Nintendo Gamecube',
-    'Quit the music generator'
-]
+        'Generate song lyrics by The Beatles',
+        'Generate a song using data from Nintendo 64',
+        'Quit the music generator'
+        ]
 
 def main():
     """
@@ -188,7 +225,6 @@ def main():
 
               It prompts the user to choose to generate either lyrics or music.
     """
-
     mainMenu = Menu(PROMPT)
 
     lyricsTrained = False
@@ -203,8 +239,7 @@ def main():
                 print('Starting lyrics generator...')
                 lyricsModel = trainLyricModels(LYRICSDIRS)
                 lyricsTrained = True
-
-            runLyricsGenerator(lyricsModel)
+                runLyricsGenerator(lyricsModel)
 
         elif userInput == 2:
             if not musicTrained:
@@ -213,11 +248,14 @@ def main():
                 musicTrained = True
 
             songName = input('What would you like to name your song? ')
-            
-            runMusicGenerator(musicModel, WAVDIR + songName + '.wav')
 
+            runMusicGenerator(musicModel, WAVDIR + songName + '1.wav', 'e')
+            runMusicGenerator(musicModel, WAVDIR + songName + '2.wav', 'd')
+            mix_files(WAVDIR + songName + '1.wav', WAVDIR + songName + '2.wav', WAVDIR + songName + '.wav')
+            generateSpectrogram(songName)
         elif userInput == 3:
             print('Thank you for using the {} music generator!'.format(TEAM))
+
             sys.exit()
 
 # This is how python tells if the file is being run as main
@@ -226,3 +264,11 @@ if __name__ == '__main__':
     # note that if you want to individually test functions from this file,
     # you can comment out main() and call those functions here. Just make
     # sure to call main() in your final submission of the project!
+  
+    #tokens = ['^::^', '^:::^', '$:::$']
+    #sentence = [[tokens[0], tokens[1], 'the', 'brown', 'dog', tokens[2]], [tokens[0], tokens[1], 'the', 'brown', 'fox', tokens[2]], [tokens[0], tokens[1], 'the', 'red', 'dog', tokens[2]], [tokens[0], tokens[1], 'my', 'cool', 'dog', tokens[2]] ]
+    #sentence2 = [tokens[0], tokens[1], "In", "the", "beginning", "the", "universe", "was", "created", tokens[2]]
+    #model = LanguageModel()
+    #model.selectNGramModel(sentence2)
+    #print(model)
+    #print(generateTokenSentence(model, 3))
